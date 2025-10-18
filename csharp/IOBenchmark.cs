@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using System.Threading;
+using System.Diagnostics;
 
 namespace Benchmark
 {
@@ -9,97 +9,92 @@ namespace Benchmark
     {
         private static Random random = new Random();
 
-        private static async Task CreateTestFiles(int count)
+        static async Task CreateTestFiles(int count, string taskId)
         {
+            var random = new Random();
             var tasks = new Task[count];
             for (int i = 0; i < count; i++)
             {
-                int index = i; // Capture for closure
-                tasks[i] = Task.Run(() =>
+                int index = i;
+                tasks[i] = Task.Run(async () =>
                 {
                     var content = $"Test file {index} content with some data: {random.NextDouble()}";
-                    var filename = $"temp_{index}.txt";
-                    File.WriteAllText(filename, content);
+                    var filename = $"temp_{taskId}_{index}.txt";
+                    await File.WriteAllTextAsync(filename, content);
                 });
             }
-
             await Task.WhenAll(tasks);
         }
 
-        private static async Task<string[]> ReadTestFiles(int count)
+        static async Task<string[]> ReadTestFiles(int count, string taskId)
         {
-            var results = new string[count];
-            var tasks = new Task[count];
-
+            var tasks = new Task<string>[count];
             for (int i = 0; i < count; i++)
             {
-                int index = i; // Capture for closure
-                tasks[i] = Task.Run(() =>
+                int index = i;
+                var filename = $"temp_{taskId}_{index}.txt";
+                tasks[i] = Task.Run(async () =>
                 {
-                    var filename = $"temp_{index}.txt";
-                    results[index] = File.ReadAllText(filename);
-                });
-            }
-
-            await Task.WhenAll(tasks);
-            return results;
-        }
-
-        private static async Task CleanupTestFiles(int count)
-        {
-            var tasks = new Task[count];
-            for (int i = 0; i < count; i++)
-            {
-                int index = i; // Capture for closure
-                tasks[i] = Task.Run(() =>
-                {
-                    try
+                    // リトライロジック
+                    for (int retry = 0; retry < 10; retry++)
                     {
-                        var filename = $"temp_{index}.txt";
+                        try
+                        {
+                            if (File.Exists(filename))
+                            {
+                                return await File.ReadAllTextAsync(filename);
+                            }
+                            await Task.Delay(10);
+                        }
+                        catch (IOException)
+                        {
+                            if (retry == 9) throw;
+                            await Task.Delay(10);
+                        }
+                    }
+                    throw new FileNotFoundException($"File not found: {filename}");
+                });
+            }
+            return await Task.WhenAll(tasks);
+        }
+
+        static async Task CleanupTestFiles(int count, string taskId)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                try
+                {
+                    var filename = $"temp_{taskId}_{i}.txt";
+                    if (File.Exists(filename))
                         File.Delete(filename);
-                    }
-                    catch
-                    {
-                        // Ignore errors
-                    }
-                });
+                }
+                catch { /* ignore */ }
             }
-
-            await Task.WhenAll(tasks);
+            await Task.CompletedTask;
         }
 
-        private static async Task SimulateNetworkDelay(int ms)
+        static async Task SimulateNetworkDelay(int ms)
         {
             await Task.Delay(ms);
         }
 
-        private static async Task<int> IOIntensiveTask()
+        static async Task<int> IOIntensiveTask(string taskId)
         {
-            var fileCount = 50;
-            var networkCalls = 20;
+            int fileCount = 50;
+            int networkCalls = 20;
 
-            // Create files concurrently
-            await CreateTestFiles(fileCount);
+            await CreateTestFiles(fileCount, taskId);
 
-            // Simulate network calls with delays
             var networkTasks = new Task[networkCalls];
             for (int i = 0; i < networkCalls; i++)
-            {
-                var delay = 10 + random.Next(20);
-                networkTasks[i] = SimulateNetworkDelay(delay);
-            }
+                networkTasks[i] = SimulateNetworkDelay(10 + (int)(new Random().NextDouble() * 20));
 
-            // Read files concurrently while network calls are happening
-            var fileContentsTask = ReadTestFiles(fileCount);
-            var networkTask = Task.WhenAll(networkTasks);
+            var fileTask = ReadTestFiles(fileCount, taskId);
 
-            var fileContents = await fileContentsTask;
-            await networkTask;
+            await Task.WhenAll(fileTask, Task.WhenAll(networkTasks));
 
-            // Cleanup
-            await CleanupTestFiles(fileCount);
-
-            return fileContents.Length;
+            await CleanupTestFiles(fileCount, taskId);
+            return fileTask.Result.Length;
         }
 
         public static async Task RunIOBenchmark(int taskCount)
@@ -116,7 +111,7 @@ namespace Benchmark
                 {
                     try
                     {
-                        await IOIntensiveTask();
+                        await IOIntensiveTask($"task{taskIndex}");
                         Console.WriteLine($"Task {taskIndex + 1} done");
                     }
                     catch (Exception e)

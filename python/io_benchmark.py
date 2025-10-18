@@ -4,13 +4,13 @@ import time
 import threading
 from queue import Queue
 
-def create_test_files(count):
+def create_test_files(count, task_id):
     errors = Queue()
     
     def create_file(i):
         try:
             content = f"Test file {i} content with some data: {random.random()}"
-            filename = f"temp_{i}.txt"
+            filename = f"temp_{task_id}_{i}.txt"
             with open(filename, 'w') as f:
                 f.write(content)
         except Exception as e:
@@ -28,15 +28,23 @@ def create_test_files(count):
     if not errors.empty():
         raise errors.get()
 
-def read_test_files(count):
+def read_test_files(count, task_id):
     results = [None] * count
     errors = Queue()
     
     def read_file(i):
         try:
-            filename = f"temp_{i}.txt"
-            with open(filename, 'r') as f:
-                results[i] = f.read()
+            filename = f"temp_{task_id}_{i}.txt"
+            # リトライロジック
+            for retry in range(10):
+                try:
+                    with open(filename, 'r') as f:
+                        results[i] = f.read()
+                    return
+                except FileNotFoundError:
+                    if retry == 9:
+                        raise
+                    time.sleep(0.01)
         except Exception as e:
             errors.put(e)
     
@@ -54,10 +62,10 @@ def read_test_files(count):
     
     return results
 
-def cleanup_test_files(count):
+def cleanup_test_files(count, task_id):
     def cleanup_file(i):
         try:
-            filename = f"temp_{i}.txt"
+            filename = f"temp_{task_id}_{i}.txt"
             os.remove(filename)
         except:
             pass  # Ignore errors
@@ -74,12 +82,12 @@ def cleanup_test_files(count):
 def simulate_network_delay(ms):
     time.sleep(ms / 1000.0)
 
-def io_intensive_task():
+def io_intensive_task(task_id):
     file_count = 50
     network_calls = 20
     
     # Create files concurrently
-    create_test_files(file_count)
+    create_test_files(file_count, task_id)
     
     # Simulate network calls with delays
     network_threads = []
@@ -90,14 +98,14 @@ def io_intensive_task():
         network_threads.append(thread)
     
     # Read files concurrently while network calls are happening
-    file_contents = read_test_files(file_count)
+    file_contents = read_test_files(file_count, task_id)
     
     # Wait for network calls to complete
     for thread in network_threads:
         thread.join()
     
     # Cleanup
-    cleanup_test_files(file_count)
+    cleanup_test_files(file_count, task_id)
     
     return len(file_contents)
 
@@ -108,7 +116,8 @@ def run_io_benchmark(task_count):
     
     def io_task(i):
         try:
-            io_intensive_task()
+            task_id = f"task{i}"
+            io_intensive_task(task_id)
             print(f"Task {i+1} done")
         except Exception as e:
             print(f"Task {i+1} failed: {e}")

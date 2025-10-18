@@ -1,7 +1,7 @@
 require 'thread'
 require 'fileutils'
 
-def create_test_files(count)
+def create_test_files(count, task_id)
   errors = []
   threads = []
   mutex = Mutex.new
@@ -10,7 +10,7 @@ def create_test_files(count)
     threads << Thread.new(i) do |index|
       begin
         content = "Test file #{index} content with some data: #{rand}"
-        filename = "temp_#{index}.txt"
+        filename = "temp_#{task_id}_#{index}.txt"
         File.write(filename, content)
       rescue => e
         mutex.synchronize { errors << e }
@@ -23,7 +23,7 @@ def create_test_files(count)
   raise errors.first unless errors.empty?
 end
 
-def read_test_files(count)
+def read_test_files(count, task_id)
   results = Array.new(count)
   errors = []
   threads = []
@@ -32,8 +32,17 @@ def read_test_files(count)
   count.times do |i|
     threads << Thread.new(i) do |index|
       begin
-        filename = "temp_#{index}.txt"
-        results[index] = File.read(filename)
+        filename = "temp_#{task_id}_#{index}.txt"
+        # リトライロジック
+        10.times do |retry_count|
+          begin
+            results[index] = File.read(filename)
+            break
+          rescue Errno::ENOENT => e
+            raise e if retry_count == 9
+            sleep 0.01
+          end
+        end
       rescue => e
         mutex.synchronize { errors << e }
       end
@@ -47,13 +56,13 @@ def read_test_files(count)
   results
 end
 
-def cleanup_test_files(count)
+def cleanup_test_files(count, task_id)
   threads = []
   
   count.times do |i|
     threads << Thread.new(i) do |index|
       begin
-        filename = "temp_#{index}.txt"
+        filename = "temp_#{task_id}_#{index}.txt"
         File.delete(filename)
       rescue
         # Ignore errors
@@ -68,12 +77,12 @@ def simulate_network_delay(ms)
   sleep(ms / 1000.0)
 end
 
-def io_intensive_task
+def io_intensive_task(task_id)
   file_count = 50
   network_calls = 20
   
   # Create files concurrently
-  create_test_files(file_count)
+  create_test_files(file_count, task_id)
   
   # Simulate network calls with delays
   network_threads = []
@@ -83,13 +92,13 @@ def io_intensive_task
   end
   
   # Read files concurrently while network calls are happening
-  file_contents = read_test_files(file_count)
+  file_contents = read_test_files(file_count, task_id)
   
   # Wait for network calls to complete
   network_threads.each(&:join)
   
   # Cleanup
-  cleanup_test_files(file_count)
+  cleanup_test_files(file_count, task_id)
   
   file_contents.length
 end
@@ -103,7 +112,8 @@ def run_io_benchmark(task_count)
   task_count.times do |i|
     task_threads << Thread.new(i) do |index|
       begin
-        io_intensive_task
+        task_id = "task#{index}"
+        io_intensive_task(task_id)
         puts "Task #{index+1} done"
       rescue => e
         puts "Task #{index+1} failed: #{e}"

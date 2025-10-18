@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
 )
 
-func createTestFiles(count int) error {
+func createTestFiles(count int, taskID string) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, count)
 	
@@ -17,9 +16,9 @@ func createTestFiles(count int) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			content := fmt.Sprintf("Test file %d content with some data: %f", i, rand.Float64())
-			filename := fmt.Sprintf("temp_%d.txt", i)
-			if err := ioutil.WriteFile(filename, []byte(content), 0644); err != nil {
+			filename := fmt.Sprintf("temp_%s_%d.txt", taskID, i)
+			content := fmt.Sprintf("Test file %d content: %f", i, rand.Float64())
+			if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
 				errChan <- err
 			}
 		}(i)
@@ -34,7 +33,7 @@ func createTestFiles(count int) error {
 	return nil
 }
 
-func readTestFiles(count int) ([]string, error) {
+func readTestFiles(count int, taskID string) ([]string, error) {
 	var wg sync.WaitGroup
 	results := make([]string, count)
 	errChan := make(chan error, count)
@@ -43,13 +42,22 @@ func readTestFiles(count int) ([]string, error) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			filename := fmt.Sprintf("temp_%d.txt", i)
-			content, err := ioutil.ReadFile(filename)
-			if err != nil {
-				errChan <- err
-				return
+			filename := fmt.Sprintf("temp_%s_%d.txt", taskID, i)
+			
+			// リトライロジック
+			var content []byte
+			var err error
+			for retry := 0; retry < 10; retry++ {
+				content, err = os.ReadFile(filename)
+				if err == nil {
+					results[i] = string(content)
+					return
+				}
+				if retry < 9 {
+					time.Sleep(20 * time.Millisecond)
+				}
 			}
-			results[i] = string(content)
+			errChan <- err
 		}(i)
 	}
 	
@@ -62,13 +70,13 @@ func readTestFiles(count int) ([]string, error) {
 	return results, nil
 }
 
-func cleanupTestFiles(count int) {
+func cleanupTestFiles(count int, taskID string) {
 	var wg sync.WaitGroup
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			filename := fmt.Sprintf("temp_%d.txt", i)
+			filename := fmt.Sprintf("temp_%s_%d.txt", taskID, i)
 			os.Remove(filename) // Ignore errors
 		}(i)
 	}
@@ -79,14 +87,17 @@ func simulateNetworkDelay(ms int) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
-func ioIntensiveTask() (int, error) {
+func ioIntensiveTask(taskID string) (int, error) {
 	fileCount := 50
 	networkCalls := 20
 	
 	// Create files concurrently
-	if err := createTestFiles(fileCount); err != nil {
+	if err := createTestFiles(fileCount, taskID); err != nil {
 		return 0, err
 	}
+	
+	// Short wait to ensure filesystem writes complete
+	time.Sleep(5 * time.Millisecond)
 	
 	// Simulate network calls with delays
 	var wg sync.WaitGroup
@@ -100,11 +111,11 @@ func ioIntensiveTask() (int, error) {
 	}
 	
 	// Read files concurrently while network calls are happening
-	fileContents, err := readTestFiles(fileCount)
+	fileContents, err := readTestFiles(fileCount, taskID)
 	wg.Wait() // Wait for network calls to complete
 	
 	// Cleanup
-	cleanupTestFiles(fileCount)
+	cleanupTestFiles(fileCount, taskID)
 	
 	if err != nil {
 		return 0, err
@@ -123,7 +134,8 @@ func RunIOBenchmark(taskCount int) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, err := ioIntensiveTask()
+			taskID := fmt.Sprintf("task%d", i)
+			_, err := ioIntensiveTask(taskID)
 			if err != nil {
 				fmt.Printf("Task %d failed: %v\n", i+1, err)
 			} else {

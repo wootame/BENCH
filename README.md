@@ -1,151 +1,104 @@
 # Multi-Language Benchmark Project
 
-このプロジェクトは、複数のプログラミング言語でCPU集約的なベンチマークとI/O集約的なベンチマークを実行し、各言語の特性を比較するためのものです。（基本 Copilot が頑張っています。）
+複数のプログラミング言語（Node.js, Go, Rust, Python, Ruby, C#, C++）でベンチマークを実行し、各言語の性能特性を比較するプロジェクトです。
 
-## 対応言語
+## 📋 ベンチマークの種類
 
-- **Node.js** - JavaScript runtime
-- **Go** - Google開発のプログラミング言語
-- **Rust** - Mozilla開発のシステムプログラミング言語
-- **Python** - 汎用プログラミング言語
-- **Ruby** - オブジェクト指向スクリプト言語
-- **C#** - Microsoft開発の.NET言語
-- **C++** - システムプログラミング言語
+### 1. CPU集約的ベンチマーク (`cpu`)
+- 平方根計算を10,000,000回実行
+- 純粋な計算処理性能を測定
 
-## ファイル構成
+### 2. 標準I/Oベンチマーク (`io`)
+- 50個の小さいファイルの読み書き
+- 20回のネットワーク遅延シミュレーション
+- 非同期処理性能を測定
 
-各言語は以下の3ファイル構成で統一されています：
+### 3. 🆕 Heavy I/Oベンチマーク (`heavy`)
+**CPU集約的な処理を含む大規模I/Oベンチマーク** *(Node.js, Go, Rust対応)*
 
-```
-<language>/
-├── main/entry file (main.go, benchmark.py, etc.)
-├── cpu-benchmark file (CPU集約的なベンチマーク)
-└── io-benchmark file (I/O集約的なベンチマーク)
-```
+- **10ファイル × 2MB** = 1タスクあたり20MB
+- SHA256ハッシュ計算 + Gzip圧縮/解凍
+- ハッシュ検証 + ネットワーク遅延シミュレーション
 
-## ベンチマークの種類
+**性能比較（5タスク）：**
+| 言語 | 時間 | 倍率 |
+|------|-----|------|
+| Node.js | 730ms | 基準 |
+| Go | 218ms | 3.35倍高速 ⚡ |
+| Rust | 193ms | 3.78倍高速 🚀 |
 
-### CPU集約的ベンチマーク
-- 数学的計算（平方根計算）を大量に実行
-- 各言語の計算処理性能を測定
+詳細は [BENCHMARK_RESULTS.md](./BENCHMARK_RESULTS.md) を参照してください。
 
-### I/O集約的ベンチマーク
-- ファイル作成・読み取り・削除操作
-- ネットワーク遅延のシミュレーション
-- 各言語の非同期処理性能を測定
+## 🚀 クイックスタート
 
-## 使用方法
-
-### 1. インタラクティブランナー（推奨）
+### インタラクティブランナー（推奨）
 
 ```bash
 npm start
-# または
-node runner.js
 ```
 
-インタラクティブなメニューで以下を選択できます：
+対話的メニューで以下を選択：
 - 実行する言語
-- ベンチマークの種類（CPU/I/O/両方）
+- ベンチマークの種類（CPU / I/O / Heavy I/O / 全て）
 - タスク数（1〜100）
 
-### 2. 個別言語での実行
-
-各言語のディレクトリで直接実行：
+### 個別実行
 
 ```bash
-# CPU集約的ベンチマーク（デフォルト10タスク）
-cd node && node index.js
-cd go && go run .
-cd rust && cargo run --release
-cd python && python benchmark.py
-cd ruby && ruby benchmark.rb
-cd csharp && dotnet run
-cd cpp && g++ -std=c++17 -O2 -o benchmark.exe *.cpp && ./benchmark.exe
+# Node.js
+cd node && node index.js        # CPU
+cd node && node index.js io 10  # I/O
+cd node && node index.js heavy 5 # Heavy I/O
 
-# I/O集約的ベンチマーク（5タスク）
-cd node && node index.js io 5
-cd go && go run . io 5
-cd rust && cargo run --release -- io 5
-cd python && python benchmark.py io 5
-cd ruby && ruby benchmark.rb io 5
-cd csharp && dotnet run -- io 5
-cd cpp && ./benchmark.exe io 5
+# Go
+cd go && go build && ./go-benchmark.exe      # CPU
+cd go && ./go-benchmark.exe io 10            # I/O
+cd go && ./go-benchmark.exe heavy 5          # Heavy I/O
+
+# Rust
+cd rust && cargo build --release
+cd rust && ./target/release/rust.exe         # CPU
+cd rust && ./target/release/rust.exe io 10   # I/O
+cd rust && ./target/release/rust.exe heavy 5 # Heavy I/O
 ```
 
-### 3. バッチ実行（レガシー）
+## 📁 プロジェクト構造
 
-```bash
-# CPU集約的ベンチマーク（すべての言語、5タスク）
-run-all.bat 5
-
-# I/O集約的ベンチマーク（すべての言語、3タスク）
-run-all-io.bat 3
+各言語は3ファイル構成：
+```
+<language>/
+├── main/entry file       # エントリーポイント
+├── cpu-benchmark file    # CPU集約的ベンチマーク
+├── io-benchmark file     # 標準I/Oベンチマーク
+└── io-benchmark-heavy*   # Heavy I/Oベンチマーク (Node.js, Go, Rust)
 ```
 
-## パラメータ
+## 📊 パフォーマンス要約
 
-- **タスク数**: 実行する並列タスクの数（デフォルト: 10）
-- **ベンチマークモード**: `cpu`（デフォルト）または `io`
+詳細な分析は [BENCHMARK_RESULTS.md](./BENCHMARK_RESULTS.md)、クイックリファレンスは [PERFORMANCE_SUMMARY.md](./PERFORMANCE_SUMMARY.md) を参照してください。
 
-## 結果の見方
+### なぜNode.jsが遅いのか？
+1. **シングルスレッド** - CPU処理が他の操作をブロック
+2. **GCオーバーヘッド** - 大量のデータ生成でメモリ圧力
+3. **直列化** - async/awaitでも真の並列処理は不可
 
-### CPU集約的ベンチマーク
-- 各言語の計算処理速度を比較
-- 一般的にコンパイル言語（Rust, Go, C++, C#）が高速
+### なぜGo/Rustが速いのか？
+1. **マルチコア活用** - 全CPU コアで真の並列処理
+2. **ネイティブコード** - コンパイル済みで高速実行
+3. **効率的メモリ管理** - GC最小またはゼロ
 
-### I/O集約的ベンチマーク
-- 各言語の非同期処理とI/O効率を比較
-- Node.jsやGo、Rustなどの非同期処理に優れた言語が有利
+## 🔧 対応言語
 
-## 技術詳細
+- **Node.js** - v16+ (標準+Heavy対応)
+- **Go** - 1.20+ (標準+Heavy対応)
+- **Rust** - 1.70+ (標準+Heavy対応)
+- **Python** - 3.8+
+- **Ruby** - 2.7+
+- **C#** - .NET 6.0+
+- **C++** - C++17+
 
-### CPU集約的処理
-```javascript
-// 例: 1千万回の平方根計算
-for (let i = 0; i < 10_000_000; i++) {
-    sum += Math.sqrt(i * Math.random());
-}
-```
+## 📝 ライセンス
 
-### I/O集約的処理
-```javascript
-// 例: 50ファイルの作成・読み取り + 20回のネットワーク遅延シミュレーション
-await Promise.all([
-    createFiles(50),
-    simulateNetworkCalls(20)
-]);
-```
+教育・比較目的で提供されています。
 
-## 必要な環境
 
-- **Node.js**: v14以上
-- **Go**: v1.19以上
-- **Rust**: v1.70以上
-- **Python**: v3.8以上
-- **Ruby**: v2.7以上
-- **C#**: .NET 6以上
-- **C++**: C++17対応コンパイラ（g++など）
-
-## プロジェクトの目的
-
-このプロジェクトは、各プログラミング言語の以下の特性を理解するために作成されました：
-
-1. **計算処理性能**: CPU集約的なタスクでの実行速度
-2. **I/O処理性能**: ファイル操作や非同期処理の効率
-3. **メモリ使用量**: 各言語のメモリ効率（観測可能）
-4. **開発効率**: コードの簡潔性と実装の複雑さ
-
-## 拡張方法
-
-新しい言語を追加する場合：
-
-1. 言語ディレクトリを作成
-2. 3ファイル構成で実装（main + cpu-benchmark + io-benchmark）
-3. `runner.js`の`languages`オブジェクトに言語設定を追加
-4. バッチファイルに対応コマンドを追加
-
----
-
-**作成者**: GitHub Copilot  
-**目的**: プログラミング言語の特性比較とベンチマーク学習

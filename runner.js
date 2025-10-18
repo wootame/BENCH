@@ -217,17 +217,19 @@ async function selectLanguages(availableLanguages) {
 }
 
 async function selectBenchmarkMode() {
-    console.log(colorize('\\n🎯 Benchmark modes:', 'bright'));
+    console.log(colorize('\n🎯 Benchmark modes:', 'bright'));
     console.log('1. CPU-bound (mathematical computations)');
     console.log('2. I/O-bound (file operations + network simulation)');
-    console.log('3. Both');
+    console.log('3. Heavy I/O-bound (large files + compression + hashing)');
+    console.log('4. All modes');
     
-    const choice = await ask(colorize('\\nSelect benchmark mode (1-3): ', 'cyan'));
+    const choice = await ask(colorize('\nSelect benchmark mode (1-4): ', 'cyan'));
     
     switch (choice) {
         case '1': return ['cpu'];
         case '2': return ['io'];
-        case '3': return ['cpu', 'io'];
+        case '3': return ['heavy'];
+        case '4': return ['cpu', 'io', 'heavy'];
         default: return ['cpu'];
     }
 }
