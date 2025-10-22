@@ -35,48 +35,56 @@ function colorize(text, color) {
     return `${colors[color]}${text}${colors.reset}`;
 }
 
+// 順序: C++, Rust, Go, C#, Node, Python, Ruby
 const languages = {
-    'node': {
-        name: 'Node.js',
-        command: 'node index.js',
-        buildCommand: null,
-        color: 'green'
-    },
-    'go': {
-        name: 'Go',
-        command: 'go run .',
-        buildCommand: 'go build -o go-benchmark.exe .',
-        color: 'cyan'
+    'cpp': {
+        name: 'C++',
+        command: '.\\\\benchmark.exe',
+        buildCommand: 'g++ -std=c++17 -O2 -o benchmark.exe benchmark.cpp cpu_benchmark.cpp io_benchmark.cpp',
+        color: 'white',
+        isCompiled: true
     },
     'rust': {
         name: 'Rust',
         command: 'cargo run --release --',
         buildCommand: 'cargo build --release',
-        color: 'red'
+        color: 'red',
+        isCompiled: true
     },
-    'python': {
-        name: 'Python',
-        command: 'python benchmark.py',
-        buildCommand: null,
-        color: 'yellow'
-    },
-    'ruby': {
-        name: 'Ruby',
-        command: 'ruby benchmark.rb',
-        buildCommand: null,
-        color: 'magenta'
+    'go': {
+        name: 'Go',
+        command: 'go run .',
+        buildCommand: 'go build -o go-benchmark.exe .',
+        color: 'cyan',
+        isCompiled: true
     },
     'csharp': {
         name: 'C#',
         command: 'dotnet run --',
         buildCommand: 'dotnet build -c Release',
-        color: 'blue'
+        color: 'blue',
+        isCompiled: true
     },
-    'cpp': {
-        name: 'C++',
-        command: '.\\\\benchmark.exe',
-        buildCommand: 'g++ -std=c++17 -O2 -o benchmark.exe benchmark.cpp cpu_benchmark.cpp io_benchmark.cpp',
-        color: 'white'
+    'node': {
+        name: 'Node.js',
+        command: 'node index.js',
+        buildCommand: null,
+        color: 'green',
+        isCompiled: false
+    },
+    'python': {
+        name: 'Python',
+        command: 'python benchmark.py',
+        buildCommand: null,
+        color: 'yellow',
+        isCompiled: false
+    },
+    'ruby': {
+        name: 'Ruby',
+        command: 'ruby benchmark.rb',
+        buildCommand: null,
+        color: 'magenta',
+        isCompiled: false
     }
 };
 
@@ -194,12 +202,26 @@ async function selectLanguages(availableLanguages) {
     Object.entries(availableLanguages).forEach(([key, lang], index) => {
         console.log(`${index + 1}. ${colorize(lang.name, lang.color)}`);
     });
-    console.log(`${Object.keys(availableLanguages).length + 1}. All languages`);
+    const allIndex = Object.keys(availableLanguages).length + 1;
+    const compiledIndex = allIndex + 1;
+    console.log(`${allIndex}. All languages`);
+    console.log(`${compiledIndex}. Compiled languages only (C++, Rust, Go, C#)`);
     
     const choice = await ask(colorize('\\nSelect languages (comma-separated numbers or "all"): ', 'cyan'));
     
-    if (choice.toLowerCase() === 'all' || choice === `${Object.keys(availableLanguages).length + 1}`) {
+    if (choice.toLowerCase() === 'all' || choice === `${allIndex}`) {
         return availableLanguages;
+    }
+    
+    if (choice === `${compiledIndex}`) {
+        // コンパイル言語のみを返す
+        const compiled = {};
+        Object.entries(availableLanguages).forEach(([key, lang]) => {
+            if (lang.isCompiled) {
+                compiled[key] = lang;
+            }
+        });
+        return compiled;
     }
     
     const selected = {};
