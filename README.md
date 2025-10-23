@@ -73,32 +73,4 @@ cd rust && ./target/release/rust.exe heavy 5 # Heavy I/O
 └── io-benchmark-heavy*   # Heavy I/Oベンチマーク (Node.js, Go, Rust)
 ```
 
-## 📊 パフォーマンス要約
-
-詳細な分析は [BENCHMARK_RESULTS.md](./BENCHMARK_RESULTS.md)、クイックリファレンスは [PERFORMANCE_SUMMARY.md](./PERFORMANCE_SUMMARY.md) を参照してください。
-
-### なぜNode.jsが遅いのか？
-1. **シングルスレッド** - CPU処理が他の操作をブロック
-2. **GCオーバーヘッド** - 大量のデータ生成でメモリ圧力
-3. **直列化** - async/awaitでも真の並列処理は不可
-
-### なぜGo/Rustが速いのか？
-1. **マルチコア活用** - 全CPU コアで真の並列処理
-2. **ネイティブコード** - コンパイル済みで高速実行
-3. **効率的メモリ管理** - GC最小またはゼロ
-
-## 🔧 対応言語
-
-- **Node.js** - v16+ (標準+Heavy対応)
-- **Go** - 1.20+ (標準+Heavy対応)
-- **Rust** - 1.70+ (標準+Heavy対応)
-- **Python** - 3.8+
-- **Ruby** - 2.7+
-- **C#** - .NET 6.0+
-- **C++** - C++17+
-
-## 📝 ライセンス
-
-教育・比較目的で提供されています。
-
 
